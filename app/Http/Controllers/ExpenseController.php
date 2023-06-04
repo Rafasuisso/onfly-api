@@ -7,6 +7,7 @@ use App\Http\Controllers\BaseController as BaseController;
 use App\Models\Expense;
 use Validator;
 use App\Http\Resources\ExpenseResource;
+use App\Http\Requests\ExpenseRequest;
 use Illuminate\Support\Facades\Auth;
 
 
@@ -19,7 +20,8 @@ class ExpenseController extends BaseController
      */
     public function index()
     {
-        $expenses = Expense::all();
+        $userId = Auth::id();
+        $expenses = Expense::all()->where('user_id', $userId);
     
         return $this->sendResponse(ExpenseResource::collection($expenses), 'Expenses retrieved successfully.');
     }
@@ -29,22 +31,12 @@ class ExpenseController extends BaseController
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(ExpenseRequest $request)
     {
         $input = $request->all();
    
-        $validator = Validator::make($input, [
-            'description' => 'required',
-            'value' => 'required',
-            'date' => 'required'
-        ]);
-   
-        if($validator->fails()){
-            return $this->sendError('Validation Error.', $validator->errors());       
-        }
         $userId = Auth::id();
         $input['user_id'] = $userId;
-        // dd($input);
 
         $expense = Expense::create($input);
    
@@ -59,7 +51,8 @@ class ExpenseController extends BaseController
      */
     public function show($id)
     {
-        $expense = Expense::find($id);
+        $userId = Auth::id();
+        $expense = Expense::find($id)->where('user_id', $userId);
   
         if (is_null($expense)) {
             return $this->sendError('Expense not found.');
@@ -71,24 +64,16 @@ class ExpenseController extends BaseController
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \Illuminate\Http\ExpenseRequest  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Expense $expense)
+    public function update(ExpenseRequest $request, Expense $expense)
     {
+        $this->authorize('updateAndDelete', $expense);
+        
         $input = $request->all();
-   
-        $validator = Validator::make($input, [
-            'description' => 'required',
-            'value' => 'required',
-            'date' => 'required',
-        ]);
-   
-        if($validator->fails()){
-            return $this->sendError('Validation Error.', $validator->errors());       
-        }
-   
+        
         $expense->description = $input['description'];
         $expense->value = $input['value'];
         $expense->date = $input['date'];
@@ -105,6 +90,7 @@ class ExpenseController extends BaseController
      */
     public function destroy(Expense $expense)
     {
+        $this->authorize('updateAndDelete', $expense);
         $expense->delete();
    
         return $this->sendResponse([], 'Expense deleted successfully.');
